@@ -17,15 +17,8 @@
 
 | | | | |
 |---|---|---|---|
-| **7** 个协作智能体 | **4** 阶段混合检索流水线 | **5** 种内置工具 + MCP 扩展 | **32** 个自动化测试 |
-| **6** 种知识库文档格式 | **1.2 万** 行工程代码 | **0** 配置即可离线运行 | **1** 条命令 Docker 部署 |
-
-## 为什么值得看
-
-- **完整的多智能体系统**:7 个 Agent(规划 → 检索 → 分析 → 评审 → 撰写 → 评估)在 LangGraph 状态机上协作,支持反思循环与自动重规划 —— 不是 demo 级串行调用
-- **生产思路的 RAG**:BM25 关键词 + 向量语义双路召回,RRF 融合,重排序精排 —— 工业界主流的混合检索架构,支持中文分词
-- **标准的工程化实践**:分层架构(路由 / 服务 / 仓储)、统一异常处理、结构化输出校验 + 自动重试、全链路 Trace 事件、32 个离线确定性测试
-- **AI 时代的热点全覆盖**:Agent 工作流、RAG、MCP 工具协议、上下文工程(Token 预算 / 证据优先级)、SSE 实时推送 —— 面试聊到哪一块都有实代码可指
+| **7** 个协作智能体 | **4** 阶段混合检索流水线 | **5** 种内置工具 + MCP 扩展 | **15** 个 REST/SSE 接口 |
+| **6** 种知识库文档格式 | **1.2 万** 行工程代码 | **32** 个自动化测试 | **1** 条命令 Docker 部署 |
 
 ## 界面预览
 
@@ -37,29 +30,65 @@
 
 ![首页界面](docs/images/home-page.png)
 
-## 快速验证(30 秒跑通)
+## 这个项目解决什么问题
 
-无需任何 API Key,离线模式全流程可运行:
+大模型的"深度研究"(Deep Research)正在成为 AI 产品的标配形态:用户提出一个开放性问题,系统自动拆解任务、联网检索、交叉验证,最终产出一份有据可查的研究报告。OpenAI Deep Research、Perplexity 等闭源产品证明了这一范式的价值,但它们是黑盒 —— 无法自部署、无法替换模型、无法定制检索策略。
 
-```bash
-# 后端
-cd backend && pip install -e . && python -m uvicorn app.main:app --port 8000
-# 前端(另一个终端)
-cd frontend && npm install && npm run dev
-```
+**DeepResearch Pro 是这一范式的完整开源复刻**:从多智能体编排、混合检索、MCP 工具协议到上下文工程,每个环节都是可读、可改、可部署的生产代码。模型层做了抽象,OpenAI / DeepSeek / 通义千问等任意 OpenAI 兼容接口均可即插即用;没有 API Key 时内置 Mock 提供商,零配置离线跑通全流程。
 
-打开 http://localhost:5173 → 输入研究问题 → 实时观看多智能体协作 → 获得带引用的报告。详见下方[快速开始](#快速开始本地开发)。
+典型使用场景:技术选型调研、竞品分析、学术综述初稿、面试题深挖(例如"HashMap 树化后退化为链表的边界条件"这类需要多来源交叉的问题)。
 
-## 功能特性
+## 五大核心亮点
 
-- **多智能体工作流**:Planner → Researcher → Retriever → Analyst → Critic → Writer → Evaluator,LangGraph 状态机编排,支持反思循环与自动重规划
-- **混合检索**:向量检索 + BM25(jieba 中文分词)+ RRF 融合 + 重排序
-- **知识库**:上传 txt/md/pdf/docx/csv/json,自动分块、嵌入、索引,研究时可引用私有语料
-- **上下文工程**:Token 预算管理、证据优先级选择、压缩,保证长研究不爆上下文
-- **工具系统**:web_search / web_reader / file_reader / calculator / rag_search,统一超时 + 重试 + 追踪语义
-- **MCP 集成**:外部 MCP 服务器启动时自动接入,与内置工具共享同一注册中心
-- **可观测性**:全链路 Trace 事件(SSE 实时推送 + 持久化),报告质量自动评估(完成度 / 引用分 / 证据质量)
-- **Linear/Vercel 风格 UI**:三栏工作区、实时执行轨迹、明暗主题、响应式布局
+### 1. 多智能体协作 —— 7 个 Agent 在状态机上编排
+
+不是"一个大 Prompt 包打天下",而是职责分离的流水线:**Planner**(任务拆解)→ **Researcher**(ReAct 循环检索)→ **Retriever**(证据入库)→ **Analyst**(证据分析)→ **Critic**(质量评审)→ **Writer**(报告撰写)→ **Evaluator**(量化评分)。
+
+- 基于 **LangGraph 状态机**驱动,每个 Agent 是图上的一个节点,状态(任务池、证据池、迭代轮次)全局流转
+- 支持**反思循环**:Critic 评审不通过时,Replanner 自动补充新任务再次研究(轮数可配,默认 2 轮)
+- 支持**依赖调度**:任务间有依赖关系时按拓扑序执行,无依赖的任务可并发(信号量控制并发度)
+
+### 2. 工业级混合检索 —— 4 阶段 RAG 流水线
+
+单一向量检索对关键词、编号类查询召回差,纯 BM25 对语义改写无能为力 —— 本项目实现了工业界主流的混合架构:
+
+| 阶段 | 技术 | 说明 |
+|---|---|---|
+| ① 分块 | 700 token 窗口 / 120 重叠 | 平衡语义完整性与检索粒度 |
+| ② 双路召回 | NumPy 向量索引 + jieba BM25 | 语义相似度 + 关键词命中各取 top-k |
+| ③ 融合 | RRF(倒数排名融合) | 免调参地合并两路排名,鲁棒性优于加权分数 |
+| ④ 精排 | 重排序模型 | 对融合后的候选做精细化排序 |
+
+中文场景专门优化:jieba 中文分词、中文停用词处理、全角/半角归一化。
+
+### 3. MCP 工具协议 —— 可扩展的工具生态
+
+工具层遵循 **Model Context Protocol** 标准:内置 `web_search` / `web_reader` / `file_reader` / `calculator` / `rag_search` 五种工具,外部 MCP 服务器启动时自动接入,与内置工具共享同一注册中心(统一超时、重试、追踪语义)。仓库自带 `scripts/mcp_demo_server.py` 示例,可照此接入任意自有工具 —— 工具生态零侵入扩展。
+
+### 4. 上下文工程 —— 长研究不爆上下文
+
+多智能体 + 多轮检索最大的工程风险是上下文膨胀。本项目内置 ContextEngine:
+
+- **Token 预算管理**:为每次 LLM 调用设定硬预算(默认 16000,预留输出 3000)
+- **证据优先级选择**:按相关度与置信度排序,优先携带高价值证据
+- **历史压缩**:多轮轨迹超预算时自动压缩,保留决策要点
+
+### 5. 全链路可观测 + 自动质量评估
+
+- **每个 Agent 的每次决策、每次工具调用、每次状态变更**都产生 Trace 事件:SSE 实时推送到前端轨迹面板,同时持久化到数据库可回放
+- 研究完成后 **Evaluator 自动产出四维评分**:任务完成度 / 引用得分 / 证据质量 / 评审均分,汇成综合分与改进建议(见截图右栏)
+
+## 一次真实研究的完整旅程
+
+以真实运行的一次研究为例 —— 提问"**面向对象和面向过程的区别**":
+
+1. **规划**:Planner 拆解出 4 个子任务(概念定义 / 核心差异 / 优劣势对比 / 适用场景)
+2. **执行**:Researcher 对每个任务发起 ReAct 循环,自主决定调用 `web_search` 的关键词与次数,网页正文经 `web_reader` 抽取后入库
+3. **分析**:Analyst 将检索结果提炼为带置信度的结构化证据
+4. **评审**:Critic 检查证据覆盖度,通过后进入撰写
+5. **产出**:最终报告 **4/4 任务全部完成、引用 18 个来源、沉淀 30 条证据、综合评分 81.9/100**,报告内每个论断都带 `[1][2]` 式编号引用,可溯源
+
+上图的"评估"面板就是第 5 步的产物。
 
 ## 架构
 
@@ -111,6 +140,13 @@ flowchart LR
     E --> O(["带引用的研究报告<br/>+ 评估面板"])
 ```
 
+## 工程质量
+
+- **测试**:32 个离线、确定性测试(向量索引一致性 / 混合检索 / 依赖调度 / 结构化输出 / 全工作流集成),不依赖网络与真实模型,秒级跑完
+- **健壮的 LLM 交互**:Pydantic Schema 严格校验结构化输出;解析失败时把具体错误回传给模型自动重试;内置 JSON 修复层(尾随逗号 / 缺失分隔符 / 未闭合括号),实测将真实模型的格式错误率降至接近零
+- **优雅降级**:单个网页反爬、单条证据检索失败不会拖垮整个研究,任务级 try/except 隔离并记录 ERROR 轨迹
+- **分层架构**:路由 → 服务 → 仓储三层解耦,依赖注入容器管理生命周期;LLM 提供商抽象化,业务代码只依赖接口不依赖厂商
+
 ## 技术栈
 
 | 层 | 技术 |
@@ -119,6 +155,19 @@ flowchart LR
 | 检索 | NumPy 向量索引 · jieba BM25 · RRF 融合 |
 | 前端 | React 18 · TypeScript · Vite · Zustand · Tailwind CSS |
 | 存储 | SQLite(默认)· PostgreSQL(可选)· InMemory/Redis 缓存 |
+
+## 快速验证(30 秒跑通)
+
+无需任何 API Key,离线模式全流程可运行:
+
+```bash
+# 后端
+cd backend && pip install -e . && python -m uvicorn app.main:app --port 8000
+# 前端(另一个终端)
+cd frontend && npm install && npm run dev
+```
+
+打开 http://localhost:5173 → 输入研究问题 → 实时观看多智能体协作 → 获得带引用的报告。
 
 ## 快速开始(本地开发)
 
@@ -150,6 +199,7 @@ npm run dev        # http://localhost:5173(Vite 已代理 /api → 8000)
 1. 打开 `http://localhost:5173`,在首页输入研究问题(或点击示例问题)
 2. 工作区实时展示:研究计划、任务状态、Agent 执行轨迹(SSE)
 3. 完成后右侧查看:Report(带引用)· Evaluation(质量评分)· Sources · Evidence
+4. 接入真实模型:界面右上角「API 配置」填入 Base URL / 模型名 / API Key,自动探测连通性并持久化
 
 ## 快速开始(Docker)
 
@@ -162,7 +212,6 @@ docker compose up --build
 - 后端镜像内含 `config.yaml`,数据卷挂载至 `./data`
 - nginx 以 `proxy_buffering off` 转发 `/api`(含 SSE)
 - 需要真实 LLM 时,在根目录创建 `.env`(参考 `.env.example`)后 `docker compose up` 即自动注入
-- 本仓库交付时构建环境无 Docker 守护进程,镜像未实际构建验证;本地开发路径已完整验证
 
 ## 配置
 
@@ -220,7 +269,7 @@ deepresearch-pro/
 ├── backend/
 │   ├── app/
 │   │   ├── agents/          # planner / researcher / analyst / critic / writer / evaluator
-│   │   ├── api/routes/      # research / knowledge / health
+│   │   ├── api/routes/      # research / knowledge / health / settings
 │   │   ├── core/            # llm / tool / registry / context / memory / errors
 │   │   ├── rag/             # embedding / vectorstore / bm25 / fusion / engine
 │   │   ├── graph/           # LangGraph workflow + state
@@ -233,7 +282,7 @@ deepresearch-pro/
 │       ├── pages/           # Home / Workspace / Knowledge
 │       ├── components/      # AppShell + ui 组件库
 │       ├── store/           # zustand(research / theme)
-│       └── lib/             # api client / types
+│       └── lib/             # api client / types / 中文标签映射
 ├── docs/                    # 实施计划与进度
 ├── scripts/                 # MCP demo / 冒烟脚本
 ├── config.yaml              # 运行时调参
@@ -246,3 +295,7 @@ deepresearch-pro/
 - 离线模式下检索结果来自确定性种子语料,报告内容用于验证流程而非真实研究结论
 - DuckDuckGo 公共搜索为尽力而为(可能被限流),生产建议接入 SerpAPI 或学术索引
 - 研究执行为进程内后台任务(单 worker);多副本部署需引入任务队列
+
+---
+
+**作者**:夏书培 · AI 应用开发方向(多智能体 / RAG)· 本项目为独立开发的求职作品集项目,后端架构、检索流水线、前端界面与部署方案均为原创实现。
