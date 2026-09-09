@@ -1,4 +1,7 @@
-# DeepResearch Pro
+# DeepResearch Pro — AI 自主研究平台
+
+> **一个问题进去,一份带引用、带质量评分的研究报告出来。**
+> Multi-Agent Deep Research Platform · 多智能体 × 检索增强生成(RAG)× MCP 工具协议
 
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
@@ -8,9 +11,21 @@
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
 ![Tests](https://img.shields.io/badge/tests-32%20passed-3DD68C)
 
-自主深度研究平台 —— 基于多智能体协作(Multi-Agent)、检索增强生成(RAG)、MCP 工具协议与上下文工程(Context Engineering),将一个研究问题自动转化为**带引用的报告**。
+**技术关键词**:Multi-Agent · RAG · MCP · LangGraph · FastAPI · React · SSE · Docker
 
-> 无需 API Key:内置 `MockLLMProvider` + 离线种子语料,零配置即可跑通全流程。
+## 核心数据
+
+| | | | |
+|---|---|---|---|
+| **7** 个协作智能体 | **4** 阶段混合检索流水线 | **5** 种内置工具 + MCP 扩展 | **32** 个自动化测试 |
+| **6** 种知识库文档格式 | **1.2 万** 行工程代码 | **0** 配置即可离线运行 | **1** 条命令 Docker 部署 |
+
+## 为什么值得看
+
+- **完整的多智能体系统**:7 个 Agent(规划 → 检索 → 分析 → 评审 → 撰写 → 评估)在 LangGraph 状态机上协作,支持反思循环与自动重规划 —— 不是 demo 级串行调用
+- **生产思路的 RAG**:BM25 关键词 + 向量语义双路召回,RRF 融合,重排序精排 —— 工业界主流的混合检索架构,支持中文分词
+- **标准的工程化实践**:分层架构(路由 / 服务 / 仓储)、统一异常处理、结构化输出校验 + 自动重试、全链路 Trace 事件、32 个离线确定性测试
+- **AI 时代的热点全覆盖**:Agent 工作流、RAG、MCP 工具协议、上下文工程(Token 预算 / 证据优先级)、SSE 实时推送 —— 面试聊到哪一块都有实代码可指
 
 ## 界面预览
 
@@ -21,6 +36,19 @@
 **首页 —— 输入研究问题即可开始**
 
 ![首页界面](docs/images/home-page.png)
+
+## 快速验证(30 秒跑通)
+
+无需任何 API Key,离线模式全流程可运行:
+
+```bash
+# 后端
+cd backend && pip install -e . && python -m uvicorn app.main:app --port 8000
+# 前端(另一个终端)
+cd frontend && npm install && npm run dev
+```
+
+打开 http://localhost:5173 → 输入研究问题 → 实时观看多智能体协作 → 获得带引用的报告。详见下方[快速开始](#快速开始本地开发)。
 
 ## 功能特性
 
