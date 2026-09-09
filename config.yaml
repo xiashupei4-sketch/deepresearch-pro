@@ -1,0 +1,27 @@
+# DeepResearch Pro configuration
+research:
+  max_reflection_iterations: 2
+  max_concurrency: 3
+
+retrieval:
+  chunk_size: 700
+  chunk_overlap: 120
+  vector_top_k: 20
+  bm25_top_k: 20
+  rerank_top_k: 8
+
+context:
+  max_tokens: 16000
+  reserve_output_tokens: 3000
+
+agent:
+  timeout: 120
+  max_tool_calls: 10
+
+# MCP servers (optional). Example entry (set enabled: true to activate):
+mcp:
+  servers:
+    demo:
+      enabled: false
+      command: ["python", "scripts/mcp_demo_server.py"]
+      timeout: 30
