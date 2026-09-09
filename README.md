@@ -1,12 +1,30 @@
 # DeepResearch Pro
 
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-1C3C3C?logo=langchain&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-32%20passed-3DD68C)
+
 自主深度研究平台 —— 基于多智能体协作(Multi-Agent)、检索增强生成(RAG)、MCP 工具协议与上下文工程(Context Engineering),将一个研究问题自动转化为**带引用的报告**。
 
 > 无需 API Key:内置 `MockLLMProvider` + 离线种子语料,零配置即可跑通全流程。
 
+## 界面预览
+
+**工作区 —— 研究计划 · 实时执行轨迹 · 带引用报告与质量评分**
+
+![工作区界面](docs/images/workspace-report.png)
+
+**首页 —— 输入研究问题即可开始**
+
+![首页界面](docs/images/home-page.png)
+
 ## 功能特性
 
-- **多智能体工作流**:Planner → Researcher → Retriever → Analyst → Critic → Writer → Evaluator,LuaGraph 状态机编排,支持反思循环与自动重规划
+- **多智能体工作流**:Planner → Researcher → Retriever → Analyst → Critic → Writer → Evaluator,LangGraph 状态机编排,支持反思循环与自动重规划
 - **混合检索**:向量检索 + BM25(jieba 中文分词)+ RRF 融合 + 重排序
 - **知识库**:上传 txt/md/pdf/docx/csv/json,自动分块、嵌入、索引,研究时可引用私有语料
 - **上下文工程**:Token 预算管理、证据优先级选择、压缩,保证长研究不爆上下文
@@ -17,23 +35,52 @@
 
 ## 架构
 
+```mermaid
+flowchart TB
+    subgraph FE["Frontend · React + Vite"]
+        UI1["Home 首页"]
+        UI2["Workspace 三栏工作区"]
+        UI3["Knowledge 知识库"]
+    end
+
+    subgraph BE["Backend · FastAPI + LangGraph"]
+        RS["ResearchService"]
+        WF["Research Workflow<br/>LangGraph 状态机"]
+        TR["ToolRegistry<br/>web_search / web_reader / rag_search"]
+        MCP["MCP Manager<br/>外部 MCP 服务器"]
+        RAG["RAG Engine<br/>混合检索 + RRF + 重排"]
+        CE["ContextEngine<br/>Token 预算 / 压缩"]
+        BUS["EventBus"]
+    end
+
+    DB[("SQLite / PostgreSQL<br/>会话 · 任务 · 证据 · 轨迹")]
+
+    UI1 & UI2 & UI3 -- "REST + SSE" --> RS
+    RS --> WF
+    WF --> TR
+    WF --> CE
+    TR <--> MCP
+    TR --> RAG
+    WF --> BUS
+    BUS -- "SSE 实时轨迹" --> UI2
+    RS & BUS --> DB
 ```
-┌─────────────────────────── Frontend (React + Vite) ───────────────────────────┐
-│  Home            Workspace(三栏:会话/计划+轨迹/报告+评估+证据)   Knowledge    │
-└──────────────────────────────────┬────────────────────────────────────────────┘
-                                   │ REST + SSE
-┌──────────────────────────────────▼────────────────────────────────────────────┐
-│                       Backend (FastAPI + LangGraph)                           │
-│                                                                               │
-│  ResearchService ──► Workflow(Planner→Researcher→Critic→Writer→Evaluator)     │
-│       │                    │           │                                      │
-│       │                    │      ToolRegistry ◄── MCP Manager               │
-│       │                    │      (web_search / web_reader / rag_search …)   │
-│       ▼                    ▼                                                 │
-│  RAG Engine(混合检索+RRF+重排)   ContextEngine(Token预算/压缩)              │
-│       │                                                                        │
-│  SQLite/Postgres(会话/任务/证据/轨迹)   EventBus ──► SSE                      │
-└───────────────────────────────────────────────────────────────────────────────┘
+
+## 研究工作流
+
+```mermaid
+flowchart LR
+    Q(["研究问题"]) --> P["Planner<br/>任务规划"]
+    P --> R["Researcher<br/>ReAct 循环"]
+    R --> T["Tool Calls<br/>web_search / web_reader / rag_search"]
+    T --> EV[("证据池")]
+    EV --> A["Analyst<br/>证据分析"]
+    A --> C{"Critic<br/>质量评审"}
+    C -- "未通过 · 有预算" --> RP["Replanner<br/>补充任务"]
+    RP --> R
+    C -- "通过 / 预算耗尽" --> W["Writer<br/>撰写报告"]
+    W --> E["Evaluator<br/>质量评分"]
+    E --> O(["带引用的研究报告<br/>+ 评估面板"])
 ```
 
 ## 技术栈
